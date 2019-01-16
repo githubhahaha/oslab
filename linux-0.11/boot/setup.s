@@ -28,7 +28,26 @@ begbss:
 .text
 
 entry start
-start:
+	start:
+
+!设置cs=ds=es
+	mov ax,cs
+	mov ds,ax
+	mov es,ax
+
+! Print some inane message
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#28			! 23 + 6
+	mov	bx,#0x000c		! page 0, attribute 7 (normal)
+	mov	bp,#msg1
+	mov	ax,#0x1301		! write string, move cursor
+	int	0x10
+
+! ok, we've written the message
 
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
@@ -39,11 +58,44 @@ start:
 	xor	bh,bh
 	int	0x10		! save it in known place, con_init fetches
 	mov	[0],dx		! it from 0x90000.
+
+!显示 Cursor POS: 字符串
+    mov ah,#0x03        ! read cursor pos
+    xor bh,bh
+    int 0x10
+    mov cx,#11
+    mov bx,#0x0007      ! page 0, attribute c 
+    mov bp,#cur
+    mov ax,#0x1301      ! write string, move cursor
+    int 0x10
+
+	mov ax,[0]			!find cursor info in 0x90000
+	call print_hex
+	call print_nl
+
+
 ! Get memory size (extended mem, kB)
 
 	mov	ah,#0x88
 	int	0x15
 	mov	[2],ax
+
+! Print memory message
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#10
+	mov	bx,#0x0007		! page 0, attribute 'c' (red)
+	mov	bp,#mem
+	mov	ax,#0x1301		! write string, move cursor
+	int	0x10
+
+! ok, we've written the message
+
+	mov ax,[2]			!find mem info in 0x90002
+	call print_hex
 
 ! Get video-card data:
 
@@ -61,6 +113,28 @@ start:
 	mov	[10],bx
 	mov	[12],cx
 
+
+! Print VGA message
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#19
+	mov	bx,#0x0007		! page 0, attribute 'c' (red)
+	mov	bp,#VGA
+	mov	ax,#0x1301		! write string, move cursor
+	int	0x10
+
+! ok, we've written the message
+
+	mov ax,[10]			!find mem info in 0x9000A
+	call print_hex
+
+	mov ax,[12]			!find mem info in 0x9000C
+	call print_hex
+	call print_nl
+
 ! Get hd0 data
 
 	mov	ax,#0x0000
@@ -72,6 +146,28 @@ start:
 	mov	cx,#0x10
 	rep
 	movsb
+
+! 前面修改了ds寄存器，这里将其设置为0x9000
+    mov ax,#INITSEG
+    mov ds,ax
+    mov ax,#SETUPSEG
+    mov es,ax 
+
+! Print hdd message
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh			! bh=page 显示page为0
+	int	0x10
+	
+	mov	cx,#11
+	mov	bx,#0x0007		! page 0, attribute 'c' (red)
+	mov	bp,#hdd
+	mov	ax,#0x1301		! write string, move cursor AH 入口参数 AL显示输出方式
+	int	0x10
+! ok, we've written the message
+
+	mov ax,[0x80]			!find hdd info in 0x9080
+	call print_hex
+	call print_nl
 
 ! Get hd1 data
 
@@ -85,6 +181,25 @@ start:
 	rep
 	movsb
 
+! Print disk1 message
+
+! 前面修改了ds寄存器，这里将其设置为0x9000
+    mov ax,#INITSEG
+    mov ds,ax
+    mov ax,#SETUPSEG
+    mov es,ax 
+
+	mov	ah,#0x03		! read cursor pos
+	xor	bh,bh
+	int	0x10
+	
+	mov	cx,#9
+	mov	bx,#0x0007		! page 0, attribute 'c' (red)
+	mov	bp,#disk1
+	mov	ax,#0x1301		! write string, move cursor
+	int	0x10
+! ok, we've written the message
+
 ! Check that there IS a hd1 :-)
 
 	mov	ax,#0x01500
@@ -93,7 +208,15 @@ start:
 	jc	no_disk1
 	cmp	ah,#3
 	je	is_disk1
+
+mov ax,#1111
+	call print_hex
+
 no_disk1:
+	mov ax,#0000
+	call print_hex
+	call print_nl
+
 	mov	ax,#INITSEG
 	mov	es,ax
 	mov	di,#0x0090
@@ -103,123 +226,60 @@ no_disk1:
 	stosb
 is_disk1:
 
+
 ! now we want to move to protected mode ...
 
-	cli			! no interrupts allowed !
+l: j l   			！死循环
 
-! first we move the system to it's rightful place
+!以16进制方式打印ax寄存器里的16位数
+print_hex:
+    mov cx,#4   	! 4个十六进制数字
+    mov dx,ax   	! 将ax所指的值放入dx中，ax作为参数传递寄存器
+print_digit:
+    rol dx,#4  		! 循环以使低4比特用上 !! 取dx的高4比特移到低4比特处。
+    mov ax,#0xe0f  	! ah = 请求的功能值,al = 半字节(4个比特)掩码。
+    and al,dl 		! 取dl的低4比特值。
+    add al,#0x30  	! 给al数字加上十六进制0x30
+    cmp al,#0x3a
+    jl outp  		!是一个不大于十的数字
+    add al,#0x07  	!是a~f,要多加7
+outp:
+    int 0x10
+    loop print_digit
+    ret
 
-	mov	ax,#0x0000
-	cld			! 'direction'=0, movs moves forward
-do_move:
-	mov	es,ax		! destination segment
-	add	ax,#0x1000
-	cmp	ax,#0x9000
-	jz	end_move
-	mov	ds,ax		! source segment
-	sub	di,di
-	sub	si,si
-	mov 	cx,#0x8000
-	rep
-	movsw
-	jmp	do_move
+!打印回车换行
+print_nl:
+    mov ax,#0xe0d
+    int 0x10
+    mov al,#0xa
+    int 0x10
+    ret
 
-! then we load the segment descriptors
 
-end_move:
-	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
-	mov	ds,ax
-	lidt	idt_48		! load idt with 0,0
-	lgdt	gdt_48		! load gdt with whatever appropriate
+msg1:						! length 28
+	.byte 13,10
+	.ascii "Now we are in setup..."
+	.byte 13,10,13,10
 
-! that was painless, now we enable A20
+cur:
+    .ascii "Cursor POS:"
 
-	call	empty_8042
-	mov	al,#0xD1		! command write
-	out	#0x64,al
-	call	empty_8042
-	mov	al,#0xDF		! A20 on
-	out	#0x60,al
-	call	empty_8042
+mem:						! length:10
+	.ascii "memory is:"
 
-! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
-! we put them right after the intel-reserved hardware interrupts, at
-! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
-! messed this up with the original PC, and they haven't been able to
-! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
-! which is used for the internal hardware interrupts as well. We just
-! have to reprogram the 8259's, and it isn't fun.
+hdd:
+	.ascii "the hdd is:"	! length 11
 
-	mov	al,#0x11		! initialization sequence
-	out	#0x20,al		! send it to 8259A-1
-	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
-	out	#0xA0,al		! and to 8259A-2
-	.word	0x00eb,0x00eb
-	mov	al,#0x20		! start of hardware int's (0x20)
-	out	#0x21,al
-	.word	0x00eb,0x00eb
-	mov	al,#0x28		! start of hardware int's 2 (0x28)
-	out	#0xA1,al
-	.word	0x00eb,0x00eb
-	mov	al,#0x04		! 8259-1 is master
-	out	#0x21,al
-	.word	0x00eb,0x00eb
-	mov	al,#0x02		! 8259-2 is slave
-	out	#0xA1,al
-	.word	0x00eb,0x00eb
-	mov	al,#0x01		! 8086 mode for both
-	out	#0x21,al
-	.word	0x00eb,0x00eb
-	out	#0xA1,al
-	.word	0x00eb,0x00eb
-	mov	al,#0xFF		! mask off all interrupts for now
-	out	#0x21,al
-	.word	0x00eb,0x00eb
-	out	#0xA1,al
+VGA:						! length 19
+	.ascii "KB"
+	.byte 13,10
+	.ascii "the display is:"
 
-! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
-! need no steenking BIOS anyway (except for the initial loading :-).
-! The BIOS-routine wants lots of unnecessary data, and it's less
-! "interesting" anyway. This is how REAL programmers do it.
-!
-! Well, now's the time to actually move into protected mode. To make
-! things as simple as possible, we do no register set-up or anything,
-! we let the gnu-compiled 32-bit programs do that. We just jump to
-! absolute address 0x00000, in 32-bit protected mode.
-	mov	ax,#0x0001	! protected mode (PE) bit
-	lmsw	ax		! This is it!
-	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+disk1:						! length 9
+	.ascii "is disk1:"
 
-! This routine checks that the keyboard command queue is empty
-! No timeout is used - if this hangs there is something wrong with
-! the machine, and we probably couldn't proceed anyway.
-empty_8042:
-	.word	0x00eb,0x00eb
-	in	al,#0x64	! 8042 status port
-	test	al,#2		! is input buffer full?
-	jnz	empty_8042	! yes - loop
-	ret
 
-gdt:
-	.word	0,0,0,0		! dummy
-
-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
-	.word	0x0000		! base address=0
-	.word	0x9A00		! code read/exec
-	.word	0x00C0		! granularity=4096, 386
-
-	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
-	.word	0x0000		! base address=0
-	.word	0x9200		! data read/write
-	.word	0x00C0		! granularity=4096, 386
-
-idt_48:
-	.word	0			! idt limit=0
-	.word	0,0			! idt base=0L
-
-gdt_48:
-	.word	0x800		! gdt limit=2048, 256 GDT entries
-	.word	512+gdt,0x9	! gdt base = 0X9xxxx
 	
 .text
 endtext:

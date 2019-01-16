@@ -96,7 +96,7 @@ ok_load_setup:
 	int	0x10
 	
 	mov	cx,#33
-	mov	bx,#0x0007		! page 0, attribute 7 (normal)
+	mov	bx,#0x000c		! page 0, attribute 7 (normal) c (red)
 	mov	bp,#msg1
 	mov	ax,#0x1301		! write string, move cursor
 	int	0x10
