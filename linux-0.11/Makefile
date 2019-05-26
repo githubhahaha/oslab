@@ -55,7 +55,7 @@ BootImage: boot/bootsect boot/setup tools/build
 	sync
 
 tools/build: tools/build.c
-	gcc $(CFLAGS) \
+	gcc-3.4 $(CFLAGS) \
 	-o tools/build tools/build.c
 
 boot/head.o: boot/head.s
