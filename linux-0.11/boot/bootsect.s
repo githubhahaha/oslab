@@ -95,14 +95,11 @@ ok_load_setup:
 	xor	bh,bh
 	int	0x10
 	
-	mov	cx,#41
-	mov bx,#0x0005		! page 0, atrribute c (red)
-	!mov	bx,#0x0007		! page 0, attribute 7 (normal)
+	mov	cx,#24
+	mov	bx,#0x0007		! page 0, attribute 7 (normal)
 	mov	bp,#msg1
 	mov	ax,#0x1301		! write string, move cursor
 	int	0x10
-
-	jmpi	0,SETUPSEG
 
 ! ok, we've written the message, now
 ! we want to load the system (at 0x10000)
@@ -242,15 +239,11 @@ kill_motor:
 	ret
 
 sectors:
-	.word 0     
+	.word 0
 
 msg1:
 	.byte 13,10
-	.ascii ". . ... . ."	!11
-	.byte 13,10
-	.ascii " .  .   ..."	!11
-	.byte 13,10
-	.ascii ". . ... . ."	!11
+	.ascii "Loading system ..."
 	.byte 13,10,13,10
 
 .org 508

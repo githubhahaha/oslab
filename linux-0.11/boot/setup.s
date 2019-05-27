@@ -15,7 +15,7 @@
 ! NOTE! These had better be the same as in bootsect.s!
 
 INITSEG  = 0x9000	! we move boot here - out of the way
-!SYSSEG   = 0x1000	! system loaded at 0x10000 (65536).
+SYSSEG   = 0x1000	! system loaded at 0x10000 (65536).
 SETUPSEG = 0x9020	! this is the current segment
 
 .globl begtext, begdata, begbss, endtext, enddata, endbss
@@ -30,23 +30,6 @@ begbss:
 entry start
 start:
 
-!设置cs=ds=es
-	mov	ax,cs
-	mov	ds,ax
-	mov	es,ax
-! Print some inane message
-
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	
-	
-	mov	cx,#23
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#msg2
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-
 ! ok, the read went well so we get current cursor position and save it for
 ! posterity.
 
@@ -56,53 +39,11 @@ start:
 	xor	bh,bh
 	int	0x10		! save it in known place, con_init fetches
 	mov	[0],dx		! it from 0x90000.
-
-! Print cursor info
-
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#9
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#cur
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-
-
-	mov ax,[0]
-	call print_hex
-	call print_nl
-
 ! Get memory size (extended mem, kB)
 
 	mov	ah,#0x88
 	int	0x15
 	mov	[2],ax
-
-! Print memory info
-
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#9
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#mem
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-
-	mov ax,[2]
-	call print_hex
-
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#2
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#danwei
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-	call print_nl
-
 
 ! Get video-card data:
 
@@ -119,23 +60,6 @@ start:
 	mov	[8],ax
 	mov	[10],bx
 	mov	[12],cx
-
-! Print vedio-card info
-
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#8
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#vedio
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-
-	mov ax,[10]
-	call print_hex
-	mov ax,[12]
-	call print_hex
-	call print_nl
 
 ! Get hd0 data
 
@@ -161,114 +85,142 @@ start:
 	rep
 	movsb
 
-	mov ax,#INITSEG
-	mov ds,ax
-	mov ax,#SETUPSEG
-	mov es,ax
+! Check that there IS a hd1 :-)
 
-! Print HD info
+	mov	ax,#0x01500
+	mov	dl,#0x81
+	int	0x13
+	jc	no_disk1
+	cmp	ah,#3
+	je	is_disk1
+no_disk1:
+	mov	ax,#INITSEG
+	mov	es,ax
+	mov	di,#0x0090
+	mov	cx,#0x10
+	mov	ax,#0x00
+	rep
+	stosb
+is_disk1:
 
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#10
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#cyl
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
+! now we want to move to protected mode ...
 
-	!显示具体信息
-	mov ax,[0x80]
-	call print_hex
-	call print_nl
+	cli			! no interrupts allowed !
 
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#8
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#head
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-	
-	mov ax,[0x80+0x02]
-	call print_hex
-	call print_nl
+! first we move the system to it's rightful place
 
-	mov	ah,#0x03		! read cursor pos
-	xor	bh,bh
-	int	0x10
-	mov	cx,#8
-	mov bx,#0x000c		! page 0, atrribute c (red)
-	mov	bp,#sect
-	mov	ax,#0x1301		! write string, move cursor
-	int	0x10
-	
-	mov ax,[0x80+0x0e]
-	call print_hex
-	call print_nl
+	mov	ax,#0x0000
+	cld			! 'direction'=0, movs moves forward
+do_move:
+	mov	es,ax		! destination segment
+	add	ax,#0x1000
+	cmp	ax,#0x9000
+	jz	end_move
+	mov	ds,ax		! source segment
+	sub	di,di
+	sub	si,si
+	mov 	cx,#0x8000
+	rep
+	movsw
+	jmp	do_move
 
+! then we load the segment descriptors
 
-inf_j:
-	jmp inf_j
+end_move:
+	mov	ax,#SETUPSEG	! right, forgot this at first. didn't work :-)
+	mov	ds,ax
+	lidt	idt_48		! load idt with 0,0
+	lgdt	gdt_48		! load gdt with whatever appropriate
 
-! print devices' hex info
-print_hex:
-	mov cx,#4
-	mov dx,ax
+! that was painless, now we enable A20
 
-print_digit:
-	rol dx,#4
-	mov ax,#0xe0f
-	and al,dl
-	add al,#0x30
-	cmp al,#0x3a
-	jl  outp
-	add al,#0x07
+	call	empty_8042
+	mov	al,#0xD1		! command write
+	out	#0x64,al
+	call	empty_8042
+	mov	al,#0xDF		! A20 on
+	out	#0x60,al
+	call	empty_8042
 
-outp:
-	int 0x10
-	loop print_digit
+! well, that went ok, I hope. Now we have to reprogram the interrupts :-(
+! we put them right after the intel-reserved hardware interrupts, at
+! int 0x20-0x2F. There they won't mess up anything. Sadly IBM really
+! messed this up with the original PC, and they haven't been able to
+! rectify it afterwards. Thus the bios puts interrupts at 0x08-0x0f,
+! which is used for the internal hardware interrupts as well. We just
+! have to reprogram the 8259's, and it isn't fun.
+
+	mov	al,#0x11		! initialization sequence
+	out	#0x20,al		! send it to 8259A-1
+	.word	0x00eb,0x00eb		! jmp $+2, jmp $+2
+	out	#0xA0,al		! and to 8259A-2
+	.word	0x00eb,0x00eb
+	mov	al,#0x20		! start of hardware int's (0x20)
+	out	#0x21,al
+	.word	0x00eb,0x00eb
+	mov	al,#0x28		! start of hardware int's 2 (0x28)
+	out	#0xA1,al
+	.word	0x00eb,0x00eb
+	mov	al,#0x04		! 8259-1 is master
+	out	#0x21,al
+	.word	0x00eb,0x00eb
+	mov	al,#0x02		! 8259-2 is slave
+	out	#0xA1,al
+	.word	0x00eb,0x00eb
+	mov	al,#0x01		! 8086 mode for both
+	out	#0x21,al
+	.word	0x00eb,0x00eb
+	out	#0xA1,al
+	.word	0x00eb,0x00eb
+	mov	al,#0xFF		! mask off all interrupts for now
+	out	#0x21,al
+	.word	0x00eb,0x00eb
+	out	#0xA1,al
+
+! well, that certainly wasn't fun :-(. Hopefully it works, and we don't
+! need no steenking BIOS anyway (except for the initial loading :-).
+! The BIOS-routine wants lots of unnecessary data, and it's less
+! "interesting" anyway. This is how REAL programmers do it.
+!
+! Well, now's the time to actually move into protected mode. To make
+! things as simple as possible, we do no register set-up or anything,
+! we let the gnu-compiled 32-bit programs do that. We just jump to
+! absolute address 0x00000, in 32-bit protected mode.
+	mov	ax,#0x0001	! protected mode (PE) bit
+	lmsw	ax		! This is it!
+	jmpi	0,8		! jmp offset 0 of segment 8 (cs)
+
+! This routine checks that the keyboard command queue is empty
+! No timeout is used - if this hangs there is something wrong with
+! the machine, and we probably couldn't proceed anyway.
+empty_8042:
+	.word	0x00eb,0x00eb
+	in	al,#0x64	! 8042 status port
+	test	al,#2		! is input buffer full?
+	jnz	empty_8042	! yes - loop
 	ret
 
-print_nl:
-	mov ax,#0xe0d	!CR
-	int 0x10
-	mov al,#0xa		!LF
-	int 0x10
-	ret
+gdt:
+	.word	0,0,0,0		! dummy
 
+	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+	.word	0x0000		! base address=0
+	.word	0x9A00		! code read/exec
+	.word	0x00C0		! granularity=4096, 386
 
+	.word	0x07FF		! 8Mb - limit=2047 (2048*4096=8Mb)
+	.word	0x0000		! base address=0
+	.word	0x9200		! data read/write
+	.word	0x00C0		! granularity=4096, 386
 
-msg2:
-	.byte 13,10
-	.ascii "Now we are in SETUP"	!19
-	.byte 13,10
-mem:
-	.byte 13,10
-	.ascii "memory:"	!9
-danwei:
-	.ascii "KB"			!2
+idt_48:
+	.word	0			! idt limit=0
+	.word	0,0			! idt base=0L
 
-cur:
-	.byte 13,10
-	.ascii "cursor:"	!9
-
-vedio:
-	.ascii "VD Info:"	!8
-
-hd_info:
-	.ascii "HD Info:"	!8
-
-cyl:
-	.ascii "Cylinders:"	!10
-
-head:
-	.ascii "Headers:"	!8
-sect:
-	.ascii "Secotrs:"	!8
-
-
+gdt_48:
+	.word	0x800		! gdt limit=2048, 256 GDT entries
+	.word	512+gdt,0x9	! gdt base = 0X9xxxx
+	
 .text
 endtext:
 .data
