@@ -129,6 +129,13 @@
 #define __NR_ssetmask	69
 #define __NR_setreuid	70
 #define __NR_setregid	71
+//this is my sysytem call
+#define __NR_iam	72
+#define __NR_whoami	73
+#define __NR_sem_open 74
+#define __NR_sem_wait 75
+#define __NR_sem_post 76
+#define __NR_sem_unlink 77
 
 #define _syscall0(type,name) \
 type name(void) \

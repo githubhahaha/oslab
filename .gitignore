@@ -1,9 +1,12 @@
 *.o
+*.a
 .vscode/
 hdc/
-/hdc-0.11.img
+hdc-0.11.img
 /linux-0.11/Image
 *.out
 *.map
 *.log
 /linux-0.11/tools/system
+/lab4-not-finish/
+bochsout.txt
