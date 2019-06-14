@@ -1,16 +1,13 @@
 #define __LIBRARY__
 #include <unistd.h>
-#include <linux/sched.h>
-//#include <string.h>
 #include <asm/segment.h>
 #include <asm/system.h>
 #include <linux/kernel.h>
-#include <linux/sem.h>
 
-//sem list
+/*sem list */
 
-sem_t sem_list[] = {
-    {'/0', 0, NULL}, {'/0', 0, NULL}, {'/0', 0, NULL}, {'/0', 0, NULL}, {'/0', 0, NULL}};
+sem_t sem_list[_SEM_MAX] = {
+    {'\0', 0, NULL}, {'\0', 0, NULL}, {'\0', 0, NULL}, {'\0', 0, NULL}, {'\0', 0, NULL}};
 
 sem_t *sys_sem_open(const char *name, unsigned int value)
 {
@@ -27,11 +24,11 @@ sem_t *sys_sem_open(const char *name, unsigned int value)
     if (tmp)
     {
         printk("name is too long!\n");
-        return NULL;
+        return 0;
     }
 
-    //search for the exsit sem
-    sem_t *result = NULL;
+    /*search for the exsit sem */
+    sem_t *result = 0;
     for (i = 0; i < _SEM_MAX; i++)
     {
         if (!strcmp(sem_list[i].name, nbuff))
@@ -42,10 +39,10 @@ sem_t *sys_sem_open(const char *name, unsigned int value)
         }
     }
 
-    //sem not found
+    /*sem not found */
     for (i = 0; i < _SEM_MAX; i++)
     {
-        if (sem_list[i].name[0] = '\0')
+        if (sem_list[i].name[0] == '\0')
         {
             strcpy(sem_list[i].name, nbuff);
             sem_list[i].value = value;
@@ -55,7 +52,7 @@ sem_t *sys_sem_open(const char *name, unsigned int value)
             return result;
         }
     }
-    return NULL;
+    return result;
 }
 
 int sys_sem_wait(sem_t *sem)
@@ -68,7 +65,7 @@ int sys_sem_wait(sem_t *sem)
         return -1;
     }
     sem->value--;
-    //search for sem's value is no zero
+    /*search for sem's value is no zero */
     while (sem->value < 0)
     {
         sleep_on(&(sem->queue));

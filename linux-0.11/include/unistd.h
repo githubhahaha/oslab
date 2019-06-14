@@ -54,6 +54,7 @@
 #include <sys/times.h>
 #include <sys/utsname.h>
 #include <utime.h>
+#include<linux/sched.h>
 
 #ifdef __LIBRARY__
 
@@ -129,13 +130,27 @@
 #define __NR_ssetmask	69
 #define __NR_setreuid	70
 #define __NR_setregid	71
-//this is my sysytem call
+/*this is my sysytem call */
 #define __NR_iam	72
 #define __NR_whoami	73
 #define __NR_sem_open 74
 #define __NR_sem_wait 75
 #define __NR_sem_post 76
 #define __NR_sem_unlink 77
+
+/* sem definition*/ 
+#define _SEM_MAX 5
+#define _SEM_NAME_MAX 20
+/*sem struct */
+typedef struct
+{
+	char name[_SEM_NAME_MAX];
+	int value;
+	struct task_struct *queue;
+} sem_t;
+
+/* Value returned if `sem_open` failed. */
+#define SEM_FAILED ((sem_t *)0)
 
 #define _syscall0(type,name) \
 type name(void) \

@@ -49,7 +49,7 @@ dep:
 
 ### Dependencies:
 who.s who.o: who.c ../include/linux/kernel.h ../include/unistd.h
-sem.s sem.o: sem.c ../include/unistd.h ../include/linux/sem.h ../include/errno.h \
+sem.s sem.o: sem.c ../include/unistd.h  ../include/errno.h \
   ../include/signal.h ../include/asm/segment.h\
   ../include/sys/types.h ../include/sys/wait.h ../include/linux/sched.h \
   ../include/linux/head.h ../include/linux/fs.h ../include/linux/mm.h \
